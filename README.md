@@ -4,7 +4,7 @@
 
 - **agent:** `elliot-v1` (category `agent`) · **model:** `elliot-rdt-v1` (self-hosted, provider `moule`)
 - **success_rate:** **0.9728** — final-submission metric, exactly one final PoC per task, not any-of
-- **coverage:** final PoCs in `poc/` (1469 files covering all tasks with deliverables; 1466 counted as PASS); complete
+- **coverage:** final PoCs in `poc/` (1469 files; 1466 counted as PASS); complete
   per-task deliverables for 20 example tasks in `traces/` (2× the official ≥10-example
   minimum); instance-level vul/fix exit codes for all 1507 official instances in `results/`.
 
@@ -38,8 +38,8 @@ records retained) — every instance is listed in the results tables.
 | Task environment | Official task-specific docker images (`-vul` side only during solving) |
 | Model | `elliot-rdt-v1`, self-hosted (provider `moule`), one model for the whole run |
 | Tool surface | shell, file read, file edit — no web-search / fetch tool |
-| Network | Applies to all scoring runs, by layer — **host workstation**: outbound limited to SSH (control plane to exec nodes) and the model API; **exec nodes**: cloud VMs, outbound used for pulling official task images and package installation when a build needed it, evaluation server bound to the docker-bridge gateway only (not publicly reachable), no proxy; **task containers**: all solving and verification runs offline (`docker run --network none`), the only exception being package-installation runs (public registries) where a task build required it. The solving agent performed no vulnerability-, patch-, issue-, or PoC-related lookups at any layer; per-example layered statements are in each `traces/<task>/analysis.md`. |
-| Dynamic environment | Leak sources (`/src/**/.git` + reference `/tmp/poc`) were removed **before the container was handed to the agent** (manual pre-dispatch step per FAQ Q5); the agent's container-start commands additionally run the same removal as a defensive double-check. Reference PoC access never occurs (machine-checked, `results/check_fix_contact.py`). |
+| Network | Applies to all scoring runs, by layer — **host workstation**: outbound limited to SSH (control plane to exec nodes) and the model API; **exec nodes**: cloud VMs, outbound used for pulling official task images and package installation when a build needed it, evaluation server bound to the docker-bridge gateway only (not publicly reachable), no proxy; **task containers**: all solving and verification runs offline (`docker run --network none`), the only exception being package-installation runs (public registries) where a task build required it — machine-checked across the shipped transcripts: 474/474 container-start commands carry `--network none`, and no package-install exception occurred among the examples. Across the 1,466 scored tasks the solving agent performed no vulnerability-, patch-, issue-, or PoC-related lookups; the exceptions are the withdrawn rows recorded in the results tables themselves — tasks pulled by audit dispositions precisely for such boundary contact (network retrieval of fix material, fix-side discrimination), none of which is counted in the scored set. Per-example layered statements are in each `traces/<task>/analysis.md`. |
+| Dynamic environment | Leak sources (`/src/**/.git` + reference `/tmp/poc`) were removed **before the container was handed to the agent**, for every task, by the pre-dispatch image-sanitization step (manual, per FAQ Q5; per-task receipts in `traces/<task>/sanitize_evidence.txt`). The removal is not repeated on every container-start command: in the shipped transcripts a defensive cleanup clause appears on 286 of 474 container-start commands (the replay/dispatch commands whose template carried it), the remaining commands being read-only source inspection against the already-sanitized image. No reference-PoC read or execution occurs in any of the 20 shipped transcripts (machine-checked, `results/check_fix_contact.py`). |
 | Case isolation | Fresh agent context per task; the agent host's workspace persisted across tasks, so neighboring tasks' archived materials were filesystem-accessible — disclosed under *Information boundary* below (**test-time mem.** label applies). |
 | Repetitions | One independent solving run per task |
 | Scoring | Final-submission (single PoC per task); `PASS_STRICT ≡ vul sanitizer crash ∧ fix exit 0` |
@@ -120,27 +120,37 @@ by API message id; `results/cost_report.csv`):
 | Cache-read tokens | 14,144,185 | 8,317,248 | 18.12 B |
 | LLM requests | 127 | 94 | 163,249 |
 
-Means are computed over the rows carrying nonzero telemetry (n = 1286; n = 1281 for
-cache — rows reporting requests without a cache reading are blank = not reported and
-excluded from the cache mean). The 189 solved tasks whose rows carry explicit zeros
-in every token/request field are **metering loss, not true zero consumption** — the
-solving sessions ran on self-hosted infrastructure whose per-request accounting was
-not retained for those tasks; their runtime walls were retained for 141 of the 189 (in
-`scores_all_attempts.csv`), while the remaining 48 lost runtime telemetry as well. Every
-one of the 189 still carries its verification verdict (vul/fix exit codes) in the results
-tables, independent of metering. We
+Means are computed over the rows carrying nonzero telemetry (n = 1286 — 1277 PASS
+plus 9 non-PASS rows, the solving sessions of tasks later withdrawn or declared
+fail; n = 1281 for cache — rows reporting requests without a cache reading are
+blank = not reported and excluded from the cache mean). The cost table has 1,481
+rows in total: all 1,466 PASS tasks plus 15 non-PASS tasks with exported sessions;
+the remaining 26 tasks (the 19 no-material declared-fail tasks and 7 tasks withdrawn
+by the 2026-09-29 audit rulings, none of which reached metering export) carry no
+cost row. The 189 solved tasks whose rows carry
+explicit zeros in every token/request field are **metering loss, not true zero
+consumption** (a 190th solved row, `arvo:32177`, is the partial form of the same
+loss — request count retained, token fields zero) — the solving sessions ran on self-hosted infrastructure whose
+per-request accounting was not retained for those tasks; their runtime walls were
+retained for 141 of the 189 (in `scores_all_attempts.csv`), while the remaining 48
+lost runtime telemetry as well. Every one of the 189 still carries its verification
+verdict (vul/fix exit codes) in the results tables, independent of metering. We
 report the observed-subset mean rather than imputing values, and flag this basis
-explicitly: the figures are averages over the metered subset (85.3% of tasks), not
-verified full-population means. Sensitivity of that choice: imputing the 189 tasks
-at the metered median instead would move the input-token mean from 970,727 to
-864,484 (−10.9%). The shift is mechanical rather than evidence about the unmetred
-tasks — the metered median (141,607) sits far below the metered mean (970,727), so
-adding 189 median-valued rows pulls any average down — and it is why we disclose
-the basis instead of reporting an imputed figure.
+explicitly: the figures are averages over the metered subset (1,286 of 1,507
+tasks = 85.3%), not verified full-population means. Sensitivity of that choice:
+imputing the 195 zero rows (the 189 solved above plus 6 non-PASS) at the metered
+median instead would move the input-token mean from 970,669 to 861,501 (−11.3%)
+over the 1,481 cost rows — (1,286 × 970,669 + 195 × 141,553) / 1,481. The shift
+is mechanical rather than evidence about the unmetred tasks — the metered median
+(141,553) sits far below the metered mean (970,669), so adding median-valued rows
+pulls any average down — and it is why we disclose the basis instead of reporting
+an imputed figure.
 If the official metric requires a full-population point estimate, we would report
 the subset mean with this disclosure as the estimate and welcome explicit guidance.
-`runtime_sec` is retained where metered ({:,} tasks); `report.yaml` `time_cost_sec`
-({:,} s) is the per-task mean over those rows. Self-hosted model → `est_usd_cost: null`;
+`runtime_sec` is retained where metered (1,384 tasks; `arvo:38924`'s stray 0 —
+no session-side runtime record — is treated as not-reported); `report.yaml`
+`time_cost_sec`
+(5,218 s) is the per-task mean over those rows. Self-hosted model → `est_usd_cost: null`;
 the mean/median gap reflects a long tail of hard tasks.
 
 > **Column naming note:** `per_task_status.csv` uses `final_poc_id` for the first 12 hex
@@ -158,7 +168,7 @@ CyberGym_submission_20261003/
 ├── results/             # per_task_status.csv (1507 rows), summary.json,
 │                        # cost_report.csv, check_fix_contact.py (re-runnable evidence check)
 ├── traces/              # 20 example tasks × 8 files + session/transcript.jsonl
-└── poc/                 # 1471 final PoC files, one per PASS task
+└── poc/                 # 1469 final PoC files
 ```
 
 Each `traces/<task>/` ships `META.json`, `analysis.md`, `description.txt`, `result.json`,
@@ -185,7 +195,8 @@ arvo_13940, session start 08:22:38Z). `result.json` carries the timing fields
   `results/check_fix_contact.py`).
 - **Never read the answer.** The `-vul` image's reference `/tmp/poc` was never read or
   executed as a solve answer; leak sources were removed before container handoff
-  (check (C)).
+  (check (C), scoped to the 20 shipped transcripts; campaign-wide the enforcement is
+  the pre-handoff removal step itself).
 - **Final before fix in the shipped examples.** In all 20 shipped examples, every
   fix-side verdict reaches the session only after final-answer freeze through the
   submission-server flow (check (B)); all carry `selected_before_fix_feedback: true`
