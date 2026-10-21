@@ -370,17 +370,3 @@ docker run --rm --network none -v $(pwd)/poc/<task>.poc:/tmp/poc:ro <image> <har
 ## Contact
 
 besty@bugbank.cn
-
-## Plain-language explanation / 白话说明
-
-The score still counts the final qualifying PoC for each credited task. This
-revision explains how much material was reviewed, what neighboring material was
-accessible, why five tasks were withdrawn, which tasks were re-solved, what the
-four sanitizer records show, and what `v4` means. It separates intended rules,
-observed checks and retained records so that the submission can be read with the
-appropriate evidence limits.
-
-本次修订把六个问题的说明集中补齐，并同步更正原文过于绝对的表述：
-看过某项任务的留存材料，不等于它的全部原始日志都完整；目录可访问，
-不等于已经读取；每题最终提交一个 PoC，也不等于只求解过一次。
-提交分数、模型申报、PoC 及原始结果和成本字段均不因本次文字修订而改变。
